@@ -1,5 +1,5 @@
 {
-  "name": "elabx/formbuilder-processor-mailchimp",
+  "name": "elabx/formbuilder-processor-revinate",
   "description": "FormBuilder action to forward data to Revinate",
   "type": "pw-module",
   "keywords": ["processwire"],
