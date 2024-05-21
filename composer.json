@@ -1,0 +1,19 @@
+{
+  "name": "elabx/formbuilder-processor-mailchimp",
+  "description": "FormBuilder action to forward data to Revinate",
+  "type": "pw-module",
+  "keywords": ["processwire"],
+  "homepage": "https://github.com/elabx/FormBuilderProcessoRevinate",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Eduardo San Miguel Garcia",
+      "email": "abx88as@gmail.com",
+      "homepage": "https://github.com/elabx"
+    }
+  ],
+  "require": {
+    "php": "^7.4",
+    "wireframe-framework/processwire-composer-installer": "^1.1"
+  }
+}

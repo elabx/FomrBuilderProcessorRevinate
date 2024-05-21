@@ -1,0 +1,120 @@
+<?php namespace ProcessWire;
+
+class FormBuilderProcessorRevinate extends FormBuilderProcessorAction implements Module
+{
+
+    protected $revinateFields = [
+      "first_name",
+      "last_name",
+      "address_1",
+      "address_2",
+      "city",
+      "state",
+      "country",
+      "zip",
+      "phone",
+      "email"
+    ];
+
+    public function textToArray($text, $numeric = false)
+    {
+        $value = explode("\n", $text);
+        $newValue = [];
+        foreach ($value as $row) {
+            $pos = strpos($row, '=');
+            if ($pos) {
+                $key = trim(substr($row, 0, $pos));
+                $value = trim(substr($row, $pos + 1));
+                $newValue[$key] = $value;
+            }
+        }
+        return $newValue;
+    }
+
+    public function processReady()
+    {
+        $this->addHookAfter('FormBuilderProcessor::processInputDone', function ($event) {
+            /** @var FormBuilderProcessor $fbForm */
+            $fbForm = $event->object->getFbForm();
+            $form = $event->arguments(0);
+            $tokens = $this->textToArray($this->get('revinate_tokens'), true);
+            $fields_to_rename = $this->textToArray($this->get('revinate_rename'));
+
+            if (!$tokens) {
+                return;
+            }
+
+            $http = new WireHttp();
+
+            $postData = array(
+              'tokens'   => $tokens,
+              'contacts' => []
+            );
+
+            $contactData = [];
+
+            $email = $form->find('name=email|email_address')->first()->value;
+
+            if ($email) {
+                $contactData['email'] = $email;
+            }
+
+            // add existing field values that match the recinate fields
+            foreach ($form->children as $child) {
+                if ($child->className == "InputfieldSubmit") {
+                    continue;
+                }
+                if (in_array($child->name, $this->revinateFields)) {
+                    $contactData[$child->name] = $child->val();
+                }
+            }
+
+            // rename fields
+            foreach ($fields_to_rename as $revinate_name => $form_field_name) {
+                $field_value = $form->getChildByName($form_field_name)->value;
+                if ($field_value) {
+                    $contactData[$revinate_name] = $field_value;
+                }
+            }
+
+            // exit if no email is set since it's required
+            if(!$contactData['email']) return;
+
+            $postData['contacts'] = $contactData;
+
+            try {
+                $http = new WireHttp();
+                $http->setHeader("Content-Type", "text/plain");
+                $response = $http->post("https://contact-api.inguest.com/api/add-contacts-to-lists",
+                  json_encode($postData, JSON_UNESCAPED_SLASHES));
+
+                $this->log->save("fb-revinate", "Success:" . print_r($response, true));
+
+            } catch (Exception $e) {
+                $this->log->save("fb-revinate", "Error:" . $e);
+            }
+            $c = $http->getHttpCode();
+            if ($c != 200) {
+                wire('log')->save('fb-revinate', "Error in forms endpoint.");
+            }
+        });
+    }
+
+    public function getConfigInputfields(InputfieldWrapper $inputfields)
+    {
+
+        $f = $this->modules->get('InputfieldTextarea');
+        $f->attr('name', 'revinate_tokens');
+        $f->label = 'Enter one list token per line';
+        $f->val($this->get('revinate_tokens'));
+        $inputfields->add($f);
+
+        $f = $this->modules->get('InputfieldTextarea');
+        $f->attr('name', 'revinate_rename');
+        $f->label = 'Rename fields';
+        $f->description = 'Match fields to valid Revinate fields, enter one per line below in the format: [revinate_name]=[form_field]';
+        $f->val($this->get('revinate_rename'));
+        $inputfields->add($f);
+
+    }
+}
