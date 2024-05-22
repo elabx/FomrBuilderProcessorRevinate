@@ -18,7 +18,10 @@ class FormBuilderProcessorRevinate extends FormBuilderProcessorAction implements
 
     public function textToArray($text, $numeric = false)
     {
-        $value = explode("\n", $text);
+        $value = array_map('trim', explode("\n", $text));
+        if($numeric){
+            return $value;
+        }
         $newValue = [];
         foreach ($value as $row) {
             $pos = strpos($row, '=');
@@ -31,6 +34,12 @@ class FormBuilderProcessorRevinate extends FormBuilderProcessorAction implements
         return $newValue;
     }
 
+    protected function log($log_file, $content){
+        if($this->get('revinate_debug')) {
+            wire('log')->save($log_file,$content);
+        }
+    }
+
     public function processReady()
     {
         $this->addHookAfter('FormBuilderProcessor::processInputDone', function ($event) {
@@ -39,6 +48,9 @@ class FormBuilderProcessorRevinate extends FormBuilderProcessorAction implements
             $form = $event->arguments(0);
             $tokens = $this->textToArray($this->get('revinate_tokens'), true);
             $fields_to_rename = $this->textToArray($this->get('revinate_rename'));
+
+            $this->log("fb-revinate", print_r($tokens, true));
+            $this->log("fb-revinate", print_r($fields_to_rename, true));
 
             if (!$tokens) {
                 return;
@@ -81,21 +93,23 @@ class FormBuilderProcessorRevinate extends FormBuilderProcessorAction implements
             if(!$contactData['email']) return;
 
             $postData['contacts'] = $contactData;
+            $postData = json_encode($postData, JSON_UNESCAPED_SLASHES);
+            $this->log("fb-revinate", print_r($postData, true));
 
             try {
                 $http = new WireHttp();
                 $http->setHeader("Content-Type", "text/plain");
-                $response = $http->post("https://contact-api.inguest.com/api/add-contacts-to-lists",
-                  json_encode($postData, JSON_UNESCAPED_SLASHES));
-
-                $this->log->save("fb-revinate", "Success:" . print_r($response, true));
-
+                $response = $http->post(
+                  "https://contact-api.inguest.com/api/add-contacts-to-lists",
+                  $postData
+                );
+                $this->log("fb-revinate", "Response:" . print_r($response, true));
             } catch (Exception $e) {
-                $this->log->save("fb-revinate", "Error:" . $e);
+                $this->log("fb-revinate", "Error:" . $e);
             }
             $c = $http->getHttpCode();
             if ($c != 200) {
-                wire('log')->save('fb-revinate', "Error in forms endpoint.");
+                $this->log('fb-revinate', "Error in forms endpoint.");
             }
         });
     }
@@ -112,8 +126,16 @@ class FormBuilderProcessorRevinate extends FormBuilderProcessorAction implements
         $f = $this->modules->get('InputfieldTextarea');
         $f->attr('name', 'revinate_rename');
         $f->label = 'Rename fields';
+        $f->notes = "Available fields are: email (REQUIRED), first_name ,last_name ,address_1 ,address_2 ,city ,state ,country ,zip ,phone";
         $f->description = 'Match fields to valid Revinate fields, enter one per line below in the format: [revinate_name]=[form_field]';
         $f->val($this->get('revinate_rename'));
+        $inputfields->add($f);
+
+        $f = $this->modules->get('Inputfieldcheckbox');
+        $f->attr('name', 'revinate_debug');
+        $f->label = 'Debug?';
+        $f->val($this->get('revinate_debug'));
+        $f->checked = $this->get('revinate_debug');
         $inputfields->add($f);
 
     }
