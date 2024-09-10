@@ -92,7 +92,7 @@ class FormBuilderProcessorRevinate extends FormBuilderProcessorAction implements
             // exit if no email is set since it's required
             if(!$contactData['email']) return;
 
-            $postData['contacts'] = $contactData;
+            $postData['contacts'][] = $contactData;
             $postData = json_encode($postData, JSON_UNESCAPED_SLASHES);
             $this->log("fb-revinate", print_r($postData, true));
 
