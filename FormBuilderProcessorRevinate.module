@@ -71,7 +71,7 @@ class FormBuilderProcessorRevinate extends FormBuilderProcessorAction implements
                 $contactData['email'] = $email;
             }
 
-            // add existing field values that match the recinate fields
+            // add existing field values that match the revinate fields
             foreach ($form->children as $child) {
                 if ($child->className == "InputfieldSubmit") {
                     continue;
